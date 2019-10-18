@@ -81,7 +81,14 @@ final class Discolight implements ContainerInterface
         foreach ($ref->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
             if ($returnType = $method->getReturnType()) {
                 if (! $returnType->isBuiltin()) {
-                    $returnTypeName = $method->getReturnType()->getName();
+                    $returnType = $method->getReturnType();
+                    if (null === $returnType) {
+                        throw new \RuntimeException(\sprintf(
+                            'The returnType of function %s is weird and breaks our system...',
+                            $method->getName()
+                        ));
+                    }
+                    $returnTypeName = $returnType->getName();
 
                     if (\array_key_exists($returnTypeName, $serviceFactoryMap)) {
                         throw new \RuntimeException(\sprintf(

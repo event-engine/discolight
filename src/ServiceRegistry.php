@@ -18,6 +18,12 @@ trait ServiceRegistry
      */
     private $serviceRegistry = [];
 
+    /**
+     * @template T
+     * @psalm-param class-string $serviceId
+     * @psalm-param callable():T $factory
+     * @return T
+     */
     private function makeSingleton(string $serviceId, callable $factory)
     {
         if (! isset($this->serviceRegistry[$serviceId])) {
