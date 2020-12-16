@@ -20,9 +20,14 @@ trait ServiceRegistry
 
     /**
      * @template T
-     * @psalm-param class-string $serviceId
+     *
+     * @psalm-param class-string<T> $serviceId
      * @psalm-param callable():T $factory
-     * @return T
+     * @psalm-return T
+     *
+     * @param string $serviceId
+     * @param callable $factory
+     * @return object
      */
     private function makeSingleton(string $serviceId, callable $factory)
     {
