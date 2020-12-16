@@ -1,7 +1,7 @@
 <?php
 /**
  * This file is part of event-engine/discolight.
- * (c) 2018-2019 prooph software GmbH <contact@prooph.de>
+ * (c) 2018-2020 prooph software GmbH <contact@prooph.de>
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -79,30 +79,63 @@ final class Discolight implements ContainerInterface
         $ref = new \ReflectionClass($serviceFactory);
 
         foreach ($ref->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
-            if ($returnType = $method->getReturnType()) {
-                if (! $returnType->isBuiltin()) {
-                    $returnType = $method->getReturnType();
-                    if (null === $returnType) {
-                        throw new \RuntimeException(\sprintf(
-                            'The returnType of function %s is weird and breaks our system...',
-                            $method->getName()
-                        ));
-                    }
-                    $returnTypeName = $returnType->getName();
+            if ($method->isConstructor()) {
+                continue;
+            }
 
-                    if (\array_key_exists($returnTypeName, $serviceFactoryMap)) {
-                        throw new \RuntimeException(\sprintf(
-                            'Duplicate return type in service factory detected. Method %s has the same return type like method %s. Type is %s',
-                            $method->getName(),
-                            $serviceFactoryMap[$returnTypeName],
-                            $returnTypeName
-                        ));
+            // PHP < 8 does not have the getAttributes method
+            if (method_exists($method, 'getAttributes')) {
+                $serviceIdAttributes = $method->getAttributes(ServiceDefinition::class, \ReflectionAttribute::IS_INSTANCEOF);
+                if (\count($serviceIdAttributes) > 0) {
+                    foreach ($serviceIdAttributes as $serviceIdAttribute) {
+                        /** @var ServiceDefinition $serviceDefinition */
+                        $serviceDefinition = $serviceIdAttribute->newInstance();
+                        $serviceFactoryMap = $this->addToServiceFactoryMap($serviceFactoryMap, $serviceDefinition->serviceId, $method->getName());
                     }
-
-                    $serviceFactoryMap[$returnTypeName] = $method->getName();
+                    continue;
                 }
             }
+
+            $returnType = $method->getReturnType();
+            if ($returnType instanceof \ReflectionUnionType) {
+                $returnTypes = $returnType->getTypes();
+            } else {
+                $returnTypes = [$returnType];
+            }
+
+            foreach ($returnTypes as $returnType) {
+                if (null === $returnType || $returnType->allowsNull()) {
+                    throw new \RuntimeException(\sprintf(
+                        'The returnType of function %s is weird and breaks our system. Use the %s attribute if you can not specify a return type or it is ambiguous.',
+                        $method->getName(),
+                        ServiceDefinition::class
+                    ));
+                }
+
+                if ($returnType->isBuiltin()) {
+                    continue;
+                }
+
+                $serviceFactoryMap = $this->addToServiceFactoryMap($serviceFactoryMap, $returnType->getName(), $method->getName());
+            }
         }
+
+        return $serviceFactoryMap;
+    }
+
+    private function addToServiceFactoryMap(array $serviceFactoryMap, string $serviceId, string $methodName): array
+    {
+        if (\array_key_exists($serviceId, $serviceFactoryMap)) {
+            throw new \RuntimeException(\sprintf(
+                'Duplicate service id in service factory detected. Method %s has the same return type like method %s. Type is %s. Use the %s attribute if you need to register multiple instances of the same type.',
+                $methodName,
+                $serviceFactoryMap[$serviceId],
+                $serviceId,
+                ServiceDefinition::class
+            ));
+        }
+
+        $serviceFactoryMap[$serviceId] = $methodName;
 
         return $serviceFactoryMap;
     }
