@@ -55,7 +55,7 @@ final class Discolight implements ContainerInterface
     /**
      * {@inheritdoc}
      */
-    public function has($id)
+    public function has($id): bool
     {
         $id = $this->aliasMap[$id] ?? $id;
 
